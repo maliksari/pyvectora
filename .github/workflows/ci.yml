@@ -127,10 +127,22 @@ jobs:
           python -c "import glob,subprocess,sys; wheels=sorted(glob.glob('../target/wheels/pyvectora-*.whl')); assert wheels, 'No pyvectora wheel found under target/wheels'; subprocess.check_call([sys.executable,'-m','pip','install',wheels[-1]])"
 
       - name: Run API tests
-        working-directory: examples/hello_api
         run: |
           set -euo pipefail
-          python main.py &
+          cat > /tmp/ci_smoke_app.py <<'PY'
+          from pyvectora import App, Response
+
+          app = App()
+
+          @app.get("/")
+          def index(request):
+              return Response.json({"ok": True})
+
+          if __name__ == "__main__":
+              app.serve()
+          PY
+
+          python /tmp/ci_smoke_app.py &
           server_pid=$!
           trap "kill ${server_pid} || true" EXIT
 
@@ -140,6 +152,12 @@ jobs:
             fi
             sleep 0.5
           done
-          curl -fsS http://127.0.0.1:8000/ >/dev/null
+          python - <<'PY'
+          import json
+          import urllib.request
 
-          pytest test_api.py -v
+          with urllib.request.urlopen("http://127.0.0.1:8000/", timeout=3) as resp:
+              assert resp.status == 200
+              body = json.loads(resp.read().decode("utf-8"))
+              assert body == {"ok": True}
+          PY

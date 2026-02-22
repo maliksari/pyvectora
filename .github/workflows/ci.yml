@@ -12,53 +12,50 @@ env:
   PYO3_USE_ABI3_FORWARD_COMPATIBILITY: "1"
 
 jobs:
-  # Rust checks
   rust-check:
     name: Rust Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      
+
       - name: Check formatting
         run: cargo fmt --check
-      
-      - name: Clippy
+
+      - name: Clippy (strict subset)
         run: cargo clippy --workspace --all-targets -- -D clippy::correctness -D clippy::suspicious -D clippy::perf
-      
+
       - name: Run tests
         run: cargo test --workspace
 
-  # Python checks
   python-check:
     name: Python Check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      
+
       - name: Install ruff
         run: python -m pip install --upgrade pip ruff
-      
+
       - name: Run ruff linter (critical rules)
         run: ruff check python-framework/pyvectora tests --select E9,F821,F822,F823
-      
+
       - name: Run ruff formatter check (non-blocking)
         continue-on-error: true
         run: ruff format --check python-framework/pyvectora tests
 
-  # Build and test native module
   build:
     name: Build Native Module
     needs: [rust-check, python-check]
@@ -70,7 +67,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -78,38 +75,27 @@ jobs:
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
-      
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      
+
       - name: Install maturin
         run: python -m pip install maturin
-      
+
       - name: Build native module
         working-directory: python-framework
         run: maturin build --release
-      
-      - name: Install package
-        run: |
-          python - <<'PY'
-          import glob
-          import subprocess
-          import sys
 
-          wheels = sorted(glob.glob("target/wheels/pyvectora-*.whl"))
-          if not wheels:
-              raise SystemExit("No pyvectora wheel found under target/wheels")
-          subprocess.check_call([sys.executable, "-m", "pip", "install", wheels[-1]])
-          PY
-      
+      - name: Install package
+        run: python -c "import glob,subprocess,sys; wheels=sorted(glob.glob('target/wheels/pyvectora-*.whl')); assert wheels, 'No pyvectora wheel found under target/wheels'; subprocess.check_call([sys.executable,'-m','pip','install',wheels[-1]])"
+
       - name: Test import
         run: |
           python -c "import pyvectora; print(f'Version: {pyvectora.__version__}')"
 
-  # Integration tests
   integration-test:
     name: Integration Tests
     needs: [build]
@@ -117,7 +103,7 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -125,20 +111,20 @@ jobs:
 
       - name: Upgrade pip
         run: python -m pip install --upgrade pip
-      
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      
+
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-      
+
       - name: Install maturin and test deps
         run: python -m pip install maturin pytest httpx
-      
+
       - name: Build and install
         working-directory: python-framework
         run: maturin develop
-      
+
       - name: Run API tests
         working-directory: examples/hello_api
         run: |
@@ -147,21 +133,12 @@ jobs:
           server_pid=$!
           trap "kill ${server_pid}" EXIT
 
-          python - <<'PY'
-          import time
-          import urllib.request
-
-          url = "http://127.0.0.1:8000/"
-          deadline = time.time() + 20
-          while time.time() < deadline:
-              try:
-                  with urllib.request.urlopen(url, timeout=1) as resp:
-                      if resp.status < 500:
-                          break
-              except Exception:
-                  time.sleep(0.5)
-          else:
-              raise SystemExit("Server did not become ready in time")
-          PY
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:8000/ >/dev/null; then
+              break
+            fi
+            sleep 0.5
+          done
+          curl -fsS http://127.0.0.1:8000/ >/dev/null
 
           pytest test_api.py -v

@@ -9,11 +9,11 @@
 //! - **D**: Server depends on abstract trait, not concrete implementations
 
 use crate::server::{PyRequest, PyResponse};
-use std::sync::Arc;
-use std::time::Instant;
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::Mutex;
-use tracing::{info, debug};
+use std::time::Instant;
+use tracing::{debug, info};
 
 /// Middleware trait for request/response interception
 ///
@@ -29,8 +29,7 @@ pub trait Middleware: Send + Sync {
     /// Called after the request handler
     ///
     /// Can modify the response or perform logging.
-    fn after_response(&self, _req: &PyRequest, _res: &mut PyResponse) {
-    }
+    fn after_response(&self, _req: &PyRequest, _res: &mut PyResponse) {}
 
     /// Middleware name for logging
     fn name(&self) -> &'static str {
@@ -318,7 +317,7 @@ impl Middleware for RateLimitMiddleware {
             MiddlewareResult::Respond(
                 PyResponse::text(r#"{"error":"Rate limit exceeded"}"#)
                     .with_status(429)
-                    .with_header("Content-Type", "application/json")
+                    .with_header("Content-Type", "application/json"),
             )
         }
     }

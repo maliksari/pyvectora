@@ -9,9 +9,9 @@
 //! - **L**: All errors implement common traits (Display, Error)
 //! - **D**: Python exceptions abstracted via traits
 
-use pyo3::prelude::*;
-use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::create_exception;
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::prelude::*;
 use std::panic::UnwindSafe;
 
 create_exception!(pyvectora, PyVectoraError, pyo3::exceptions::PyException);
@@ -63,7 +63,9 @@ impl std::error::Error for BindingsError {}
 impl From<BindingsError> for PyErr {
     fn from(err: BindingsError) -> PyErr {
         match err {
-            BindingsError::Panic(msg) => PyRuntimeError::new_err(format!("Internal error: {}", msg)),
+            BindingsError::Panic(msg) => {
+                PyRuntimeError::new_err(format!("Internal error: {}", msg))
+            }
             BindingsError::PythonCallback(msg) => PyRuntimeError::new_err(msg),
             BindingsError::Serialization(msg) => PyValueError::new_err(msg),
             BindingsError::Configuration(msg) => ConfigurationError::new_err(msg),
@@ -119,9 +121,15 @@ pub fn register_exceptions(m: &PyModule) -> PyResult<()> {
     m.add("PyVectoraError", m.py().get_type::<PyVectoraError>())?;
     m.add("ValidationError", m.py().get_type::<ValidationError>())?;
     m.add("NotFoundError", m.py().get_type::<NotFoundError>())?;
-    m.add("AuthenticationError", m.py().get_type::<AuthenticationError>())?;
+    m.add(
+        "AuthenticationError",
+        m.py().get_type::<AuthenticationError>(),
+    )?;
     m.add("DatabaseError", m.py().get_type::<DatabaseError>())?;
-    m.add("ConfigurationError", m.py().get_type::<ConfigurationError>())?;
+    m.add(
+        "ConfigurationError",
+        m.py().get_type::<ConfigurationError>(),
+    )?;
     Ok(())
 }
 

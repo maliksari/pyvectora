@@ -15,15 +15,15 @@
 //! - GIL released during all I/O operations
 //! - Results converted to Python dicts efficiently
 
+use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
-use pyo3::exceptions::PyRuntimeError;
 use pyvectora_core::database::{DatabasePool, DbValue};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::get_runtime;
 use crate::error::DatabaseError;
+use crate::get_runtime;
 
 /// Python-exposed database connection pool
 ///
@@ -57,11 +57,12 @@ impl PyDatabaseNative {
     #[staticmethod]
     #[pyo3(signature = (url, max_connections=None))]
     fn connect_sqlite(py: Python<'_>, url: String, max_connections: Option<u32>) -> PyResult<Self> {
-        let pool = py.allow_threads(|| {
-            get_runtime().block_on(async {
-                DatabasePool::connect_sqlite(&url, max_connections).await
+        let pool = py
+            .allow_threads(|| {
+                get_runtime()
+                    .block_on(async { DatabasePool::connect_sqlite(&url, max_connections).await })
             })
-        }).map_err(|e| DatabaseError::new_err(e.to_string()))?;
+            .map_err(|e| DatabaseError::new_err(e.to_string()))?;
 
         Ok(Self {
             inner: Arc::new(RwLock::new(Some(pool))),
@@ -78,12 +79,17 @@ impl PyDatabaseNative {
     ///     Database instance with connection pool
     #[staticmethod]
     #[pyo3(signature = (url, max_connections=None))]
-    fn connect_postgres(py: Python<'_>, url: String, max_connections: Option<u32>) -> PyResult<Self> {
-        let pool = py.allow_threads(|| {
-            get_runtime().block_on(async {
-                DatabasePool::connect_postgres(&url, max_connections).await
+    fn connect_postgres(
+        py: Python<'_>,
+        url: String,
+        max_connections: Option<u32>,
+    ) -> PyResult<Self> {
+        let pool = py
+            .allow_threads(|| {
+                get_runtime()
+                    .block_on(async { DatabasePool::connect_postgres(&url, max_connections).await })
             })
-        }).map_err(|e| DatabaseError::new_err(e.to_string()))?;
+            .map_err(|e| DatabaseError::new_err(e.to_string()))?;
 
         Ok(Self {
             inner: Arc::new(RwLock::new(Some(pool))),
@@ -103,10 +109,12 @@ impl PyDatabaseNative {
 
         pyo3_asyncio::tokio::future_into_py::<_, u64>(py, async move {
             let guard = inner.read().await;
-            let pool = guard.as_ref()
+            let pool = guard
+                .as_ref()
                 .ok_or_else(|| PyRuntimeError::new_err("Database pool is closed"))?;
 
-            pool.execute(&query).await
+            pool.execute(&query)
+                .await
                 .map_err(|e| DatabaseError::new_err(e.to_string()))
         })
     }
@@ -125,20 +133,22 @@ impl PyDatabaseNative {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let rows = {
                 let guard = inner.read().await;
-                let pool = guard.as_ref()
+                let pool = guard
+                    .as_ref()
                     .ok_or_else(|| PyRuntimeError::new_err("Database pool is closed"))?;
 
-                pool.fetch_all(&query).await
+                pool.fetch_all(&query)
+                    .await
                     .map_err(|e| DatabaseError::new_err(e.to_string()))?
             };
 
             Python::with_gil(|py| {
-                 let list = PyList::empty(py);
-                 for row in rows {
-                     let dict = convert_row_to_dict(py, row)?;
-                     list.append(dict)?;
-                 }
-                 Ok(list.to_object(py))
+                let list = PyList::empty(py);
+                for row in rows {
+                    let dict = convert_row_to_dict(py, row)?;
+                    list.append(dict)?;
+                }
+                Ok(list.to_object(py))
             })
         })
     }
@@ -157,16 +167,16 @@ impl PyDatabaseNative {
         pyo3_asyncio::tokio::future_into_py(py, async move {
             let row = {
                 let guard = inner.read().await;
-                let pool = guard.as_ref()
+                let pool = guard
+                    .as_ref()
                     .ok_or_else(|| PyRuntimeError::new_err("Database pool is closed"))?;
 
-                pool.fetch_one(&query).await
+                pool.fetch_one(&query)
+                    .await
                     .map_err(|e| DatabaseError::new_err(e.to_string()))?
             };
 
-            Python::with_gil(|py| {
-                convert_row_to_dict(py, row).map(|d| d.to_object(py))
-            })
+            Python::with_gil(|py| convert_row_to_dict(py, row).map(|d| d.to_object(py)))
         })
     }
 
@@ -178,17 +188,17 @@ impl PyDatabaseNative {
             let option_row = {
                 let guard = inner.read().await;
                 match guard.as_ref() {
-                     Some(pool) => pool.fetch_optional(&query).await
-                         .map_err(|e| DatabaseError::new_err(e.to_string()))?,
-                     None => return Err(PyRuntimeError::new_err("Database pool is closed")),
+                    Some(pool) => pool
+                        .fetch_optional(&query)
+                        .await
+                        .map_err(|e| DatabaseError::new_err(e.to_string()))?,
+                    None => return Err(PyRuntimeError::new_err("Database pool is closed")),
                 }
             };
 
-            Python::with_gil(|py| {
-                match option_row {
-                    Some(row) => convert_row_to_dict(py, row).map(|d| d.to_object(py)),
-                    None => Ok(py.None()),
-                }
+            Python::with_gil(|py| match option_row {
+                Some(row) => convert_row_to_dict(py, row).map(|d| d.to_object(py)),
+                None => Ok(py.None()),
             })
         })
     }
@@ -228,7 +238,7 @@ impl PyDatabaseNative {
 /// Convert a database row (HashMap<String, DbValue>) to Python dict
 fn convert_row_to_dict<'py>(
     py: Python<'py>,
-    row: std::collections::HashMap<String, DbValue>
+    row: std::collections::HashMap<String, DbValue>,
 ) -> PyResult<&'py PyDict> {
     let dict = PyDict::new(py);
 

@@ -10,22 +10,26 @@
 //! - Control transfers to Rust's Tokio runtime
 //! - Python handlers are called as callbacks from Rust
 
+use pyo3::exceptions::{PyStopAsyncIteration, PyStopIteration};
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString, PyBytes};
-use pyo3::exceptions::{PyStopIteration, PyStopAsyncIteration};
-use pyvectora_core::router::Method;
-use pyvectora_core::server::{PyRequest as RustRequest, PyResponse as RustResponse, Server, Handler};
-use pyvectora_core::middleware::{LoggingMiddleware, TimingMiddleware, CorsMiddleware, RateLimitMiddleware};
+use pyo3::types::{PyBytes, PyDict, PyString};
+use pyvectora_core::middleware::{
+    CorsMiddleware, LoggingMiddleware, RateLimitMiddleware, TimingMiddleware,
+};
 use pyvectora_core::middleware::{Middleware, MiddlewareResult};
+use pyvectora_core::router::Method;
+use pyvectora_core::server::{
+    Handler, PyRequest as RustRequest, PyResponse as RustResponse, Server,
+};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock, OnceLock};
+use std::sync::{Arc, OnceLock, RwLock};
 use tokio::runtime::Runtime;
-use tracing_subscriber::EnvFilter;
-use tracing::warn;
 use tokio_util::sync::CancellationToken;
+use tracing::warn;
+use tracing_subscriber::EnvFilter;
 
-mod error;
 mod database;
+mod error;
 
 use error::register_exceptions;
 use pyvectora_core::PyRequest;
@@ -43,23 +47,18 @@ static GLOBAL_RUNTIME: OnceLock<Runtime> = OnceLock::new();
 /// Thread-safe, lock-free after first initialization.
 /// Made public for database module access.
 pub(crate) fn get_runtime() -> &'static Runtime {
-    GLOBAL_RUNTIME.get_or_init(|| {
-        Runtime::new().expect("Failed to create Tokio runtime")
-    })
+    GLOBAL_RUNTIME.get_or_init(|| Runtime::new().expect("Failed to create Tokio runtime"))
 }
 
 /// Initialize tracing for the library
 fn init_tracing() {
     let _ = tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env().add_directive("pyvectora=info".parse().unwrap()))
+        .with_env_filter(
+            EnvFilter::from_default_env().add_directive("pyvectora=info".parse().unwrap()),
+        )
         .json()
         .try_init();
 }
-
-/// Python-exposed Request object
-///
-/// Contains request data with typed params (FAZ 2) and
-/// headers/query access (FAZ 3).
 
 /// Convert JSON value to Python object
 fn json_to_pyobject(py: Python<'_>, value: &serde_json::Value) -> PyResult<PyObject> {
@@ -206,10 +205,19 @@ struct Route {
 
 #[derive(Clone)]
 enum MiddlewareConfig {
-    Logging { log_headers: bool },
+    Logging {
+        log_headers: bool,
+    },
     Timing,
-    Cors { allow_origin: String, allow_methods: String, allow_headers: String },
-    RateLimit { capacity: u64, refill_per_sec: u64 },
+    Cors {
+        allow_origin: String,
+        allow_methods: String,
+        allow_headers: String,
+    },
+    RateLimit {
+        capacity: u64,
+        refill_per_sec: u64,
+    },
 }
 
 /// Python-exposed App object
@@ -362,7 +370,8 @@ impl PyApp {
     /// Enable logging middleware
     #[pyo3(signature = (log_headers=false))]
     fn enable_logging_middleware(&mut self, log_headers: bool) {
-        self.middlewares.push(MiddlewareConfig::Logging { log_headers });
+        self.middlewares
+            .push(MiddlewareConfig::Logging { log_headers });
     }
 
     /// Enable timing middleware
@@ -372,7 +381,12 @@ impl PyApp {
 
     /// Enable CORS middleware
     #[pyo3(signature = (allow_origin="*", allow_methods="GET, POST, PUT, DELETE, PATCH, OPTIONS", allow_headers="Content-Type, Authorization"))]
-    fn enable_cors_middleware(&mut self, allow_origin: &str, allow_methods: &str, allow_headers: &str) {
+    fn enable_cors_middleware(
+        &mut self,
+        allow_origin: &str,
+        allow_methods: &str,
+        allow_headers: &str,
+    ) {
         self.middlewares.push(MiddlewareConfig::Cors {
             allow_origin: allow_origin.to_string(),
             allow_methods: allow_methods.to_string(),
@@ -383,7 +397,10 @@ impl PyApp {
     /// Enable rate limit middleware
     #[pyo3(signature = (capacity=100, refill_per_sec=100))]
     fn enable_rate_limit_middleware(&mut self, capacity: u64, refill_per_sec: u64) {
-        self.middlewares.push(MiddlewareConfig::RateLimit { capacity, refill_per_sec });
+        self.middlewares.push(MiddlewareConfig::RateLimit {
+            capacity,
+            refill_per_sec,
+        });
     }
 
     /// Set max request body size (bytes)
@@ -405,7 +422,8 @@ impl PyApp {
         let port = self.port;
         let jwt_secret = self.jwt_secret.clone();
         let middleware_data = self.middlewares.clone();
-        let python_middleware_data: Vec<PyObject> = self.python_middlewares
+        let python_middleware_data: Vec<PyObject> = self
+            .python_middlewares
             .iter()
             .map(|m| m.clone_ref(py))
             .collect();
@@ -418,12 +436,16 @@ impl PyApp {
             auth: bool,
         }
 
-        let route_data: Vec<RouteData> = self.routes.iter().map(|r| RouteData {
-            method: r.method,
-            path: r.path.clone(),
-            handler: r.handler.clone_ref(py),
-            auth: r.auth,
-        }).collect();
+        let route_data: Vec<RouteData> = self
+            .routes
+            .iter()
+            .map(|r| RouteData {
+                method: r.method,
+                path: r.path.clone(),
+                handler: r.handler.clone_ref(py),
+                auth: r.auth,
+            })
+            .collect();
 
         init_asyncio_once(py)?;
 
@@ -446,11 +468,16 @@ impl PyApp {
 
             for route in route_data {
                 let rust_handler = create_handler_adapter(route.handler, locals.clone());
-                server.add_route(route.method, &route.path, rust_handler, route.auth)
-                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
+                server
+                    .add_route(route.method, &route.path, rust_handler, route.auth)
+                    .map_err(|e| {
+                        PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string())
+                    })?;
             }
 
-            server.serve().await
+            server
+                .serve()
+                .await
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
 
             Ok(())
@@ -461,7 +488,8 @@ impl PyApp {
     fn test_client(&self, py: Python<'_>) -> PyResult<PyServer> {
         let jwt_secret = self.jwt_secret.clone();
         let middleware_data = self.middlewares.clone();
-        let python_middleware_data: Vec<PyObject> = self.python_middlewares
+        let python_middleware_data: Vec<PyObject> = self
+            .python_middlewares
             .iter()
             .map(|m| m.clone_ref(py))
             .collect();
@@ -474,12 +502,16 @@ impl PyApp {
             auth: bool,
         }
 
-        let route_data: Vec<RouteData> = self.routes.iter().map(|r| RouteData {
-            method: r.method,
-            path: r.path.clone(),
-            handler: r.handler.clone_ref(py),
-            auth: r.auth,
-        }).collect();
+        let route_data: Vec<RouteData> = self
+            .routes
+            .iter()
+            .map(|r| RouteData {
+                method: r.method,
+                path: r.path.clone(),
+                handler: r.handler.clone_ref(py),
+                auth: r.auth,
+            })
+            .collect();
 
         init_asyncio_once(py)?;
 
@@ -505,7 +537,8 @@ impl PyApp {
 
         for route in route_data {
             let rust_handler = create_handler_adapter(route.handler, locals.clone());
-            server.add_route(route.method, &route.path, rust_handler, route.auth)
+            server
+                .add_route(route.method, &route.path, rust_handler, route.auth)
                 .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))?;
         }
 
@@ -523,8 +556,7 @@ fn init_asyncio_once(_py: Python<'_>) -> PyResult<()> {
 }
 
 fn build_tokio_runtime() -> PyResult<Runtime> {
-    Runtime::new()
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+    Runtime::new().map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
 }
 
 fn apply_middlewares(server: &mut Server, configs: &[MiddlewareConfig]) {
@@ -540,14 +572,21 @@ fn apply_middlewares(server: &mut Server, configs: &[MiddlewareConfig]) {
             MiddlewareConfig::Timing => {
                 server.add_middleware(TimingMiddleware::new());
             }
-            MiddlewareConfig::Cors { allow_origin, allow_methods, allow_headers } => {
+            MiddlewareConfig::Cors {
+                allow_origin,
+                allow_methods,
+                allow_headers,
+            } => {
                 let mw = CorsMiddleware::new()
                     .allow_origin(allow_origin.clone())
                     .allow_methods(allow_methods.clone())
                     .allow_headers(allow_headers.clone());
                 server.add_middleware(mw);
             }
-            MiddlewareConfig::RateLimit { capacity, refill_per_sec } => {
+            MiddlewareConfig::RateLimit {
+                capacity,
+                refill_per_sec,
+            } => {
                 server.add_middleware(RateLimitMiddleware::new(*capacity, *refill_per_sec));
             }
         }
@@ -584,7 +623,9 @@ impl PythonMiddleware {
             let result = callable.call1(py, (py_req,))?;
             let obj = result.to_object(py);
             if is_coroutine(py, &obj) {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Middleware must be sync"));
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Middleware must be sync",
+                ));
             }
             if result.is_none(py) {
                 Ok(None)
@@ -605,7 +646,9 @@ impl PythonMiddleware {
             let result = callable.call1(py, (py_req, py_res))?;
             let obj = result.to_object(py);
             if is_coroutine(py, &obj) {
-                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Middleware must be sync"));
+                return Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+                    "Middleware must be sync",
+                ));
             }
             if result.is_none(py) {
                 Ok(None)
@@ -647,7 +690,9 @@ fn select_callable(py: Python<'_>, target: &PyObject, method: &str) -> Result<Py
     } else if any.is_callable() {
         Ok(target.clone_ref(py))
     } else {
-        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>("Middleware is not callable"))
+        Err(PyErr::new::<pyo3::exceptions::PyTypeError, _>(
+            "Middleware is not callable",
+        ))
     }
 }
 
@@ -658,7 +703,11 @@ fn rust_response_to_py(py: Python<'_>, res: &RustResponse) -> PyResult<PyObject>
     Ok(py_resp.to_object(py))
 }
 
-fn apply_python_middlewares(server: &mut Server, items: &[PyObject], locals: pyo3_asyncio::TaskLocals) {
+fn apply_python_middlewares(
+    server: &mut Server,
+    items: &[PyObject],
+    locals: pyo3_asyncio::TaskLocals,
+) {
     Python::with_gil(|py| {
         for item in items {
             server.add_middleware(PythonMiddleware::new(item.clone_ref(py), locals.clone()));
@@ -686,9 +735,7 @@ fn create_handler_adapter(handler: PyObject, locals: pyo3_asyncio::TaskLocals) -
         let token = CancellationToken::new();
         let ctx = PyExecutionContext::new(token.clone());
 
-        Box::pin(async move {
-            execute_handler(handler, ctx, req, locals).await
-        })
+        Box::pin(async move { execute_handler(handler, ctx, req, locals).await })
     })
 }
 
@@ -696,7 +743,8 @@ fn is_coroutine_function(handler: &PyObject) -> bool {
     Python::with_gil(|py| {
         let inspect = py.import("inspect").ok();
         if let Some(inspect) = inspect {
-             inspect.call_method1("iscoroutinefunction", (handler,))
+            inspect
+                .call_method1("iscoroutinefunction", (handler,))
                 .map(|res| res.is_true().unwrap_or(false))
                 .unwrap_or(false)
         } else {
@@ -712,7 +760,8 @@ fn convert_py_error(err: PyErr) -> RustResponse {
         RustResponse::json(format!(
             r#"{{"error": "Internal Server Error", "details": "{}"}}"#,
             error_msg
-        )).with_status(500)
+        ))
+        .with_status(500)
     })
 }
 
@@ -724,24 +773,28 @@ async fn execute_handler(
 ) -> RustResponse {
     let is_async = is_coroutine_function(&handler);
 
-    let fut_result = Python::with_gil(|py| -> PyResult<std::pin::Pin<Box<dyn std::future::Future<Output = PyResult<PyObject>> + Send>>> {
-        if is_async {
-            let py_req = req.clone().into_py(py);
-            let py_ctx = Py::new(py, ctx)?;
-            py_req.as_ref(py).setattr("context", py_ctx)?;
+    let fut_result = Python::with_gil(
+        |py| -> PyResult<
+            std::pin::Pin<Box<dyn std::future::Future<Output = PyResult<PyObject>> + Send>>,
+        > {
+            if is_async {
+                let py_req = req.clone().into_py(py);
+                let py_ctx = Py::new(py, ctx)?;
+                py_req.as_ref(py).setattr("context", py_ctx)?;
 
-            let coro = handler.call1(py, (py_req,))?;
-            let fut = pyo3_asyncio::into_future_with_locals(&locals, coro.as_ref(py))?;
-            Ok(Box::pin(fut))
-        } else {
-            let py_req = req.clone().into_py(py);
-            let py_ctx = Py::new(py, ctx)?;
-            py_req.as_ref(py).setattr("context", py_ctx)?;
+                let coro = handler.call1(py, (py_req,))?;
+                let fut = pyo3_asyncio::into_future_with_locals(&locals, coro.as_ref(py))?;
+                Ok(Box::pin(fut))
+            } else {
+                let py_req = req.clone().into_py(py);
+                let py_ctx = Py::new(py, ctx)?;
+                py_req.as_ref(py).setattr("context", py_ctx)?;
 
-            let resp = handler.call1(py, (py_req,))?;
-            Ok(Box::pin(std::future::ready(Ok(resp))))
-        }
-    });
+                let resp = handler.call1(py, (py_req,))?;
+                Ok(Box::pin(std::future::ready(Ok(resp))))
+            }
+        },
+    );
 
     let result = match fut_result {
         Ok(fut) => fut.await,
@@ -749,14 +802,14 @@ async fn execute_handler(
     };
 
     match result {
-         Ok(py_resp) => {
-             if Python::with_gil(|py| is_streaming_response(py, &py_resp)) {
-                 collect_streaming_response(py_resp, &locals).await
-             } else {
-                 Python::with_gil(|py| convert_python_response(py, py_resp))
-             }
-         }
-         Err(e) => convert_py_error(e),
+        Ok(py_resp) => {
+            if Python::with_gil(|py| is_streaming_response(py, &py_resp)) {
+                collect_streaming_response(py_resp, &locals).await
+            } else {
+                Python::with_gil(|py| convert_python_response(py, py_resp))
+            }
+        }
+        Err(e) => convert_py_error(e),
     }
 }
 
@@ -814,8 +867,7 @@ fn convert_python_response(py: Python<'_>, result: PyObject) -> RustResponse {
         return RustResponse::json("{}".to_string());
     }
 
-    RustResponse::text("Internal Server Error: Unsupported response type")
-        .with_status(500)
+    RustResponse::text("Internal Server Error: Unsupported response type").with_status(500)
 }
 
 fn is_streaming_response(py: Python<'_>, result: &PyObject) -> bool {
@@ -832,11 +884,16 @@ async fn collect_streaming_response(
 ) -> RustResponse {
     let (status, content_type, headers, content) = match Python::with_gil(|py| {
         let resp = result.as_ref(py);
-        let status = resp.getattr("status").and_then(|v| v.extract::<u16>()).unwrap_or(200);
-        let content_type = resp.getattr("content_type")
+        let status = resp
+            .getattr("status")
+            .and_then(|v| v.extract::<u16>())
+            .unwrap_or(200);
+        let content_type = resp
+            .getattr("content_type")
             .and_then(|v| v.extract::<String>())
             .unwrap_or_else(|_| "text/plain".to_string());
-        let headers = resp.getattr("headers")
+        let headers = resp
+            .getattr("headers")
             .and_then(|h| h.extract::<HashMap<String, String>>())
             .unwrap_or_default();
         let mut content = resp.getattr("content")?;
@@ -857,7 +914,12 @@ async fn collect_streaming_response(
     });
 
     if is_async {
-        let async_iter = Python::with_gil(|py| content.as_ref(py).call_method0("__aiter__").map(|v| v.into_py(py)));
+        let async_iter = Python::with_gil(|py| {
+            content
+                .as_ref(py)
+                .call_method0("__aiter__")
+                .map(|v| v.into_py(py))
+        });
         let async_iter = match async_iter {
             Ok(v) => v,
             Err(err) => return convert_py_error(err),
@@ -879,7 +941,8 @@ async fn collect_streaming_response(
                     }
                 }
                 Err(err) => {
-                    let is_stop = Python::with_gil(|py| err.is_instance_of::<PyStopAsyncIteration>(py));
+                    let is_stop =
+                        Python::with_gil(|py| err.is_instance_of::<PyStopAsyncIteration>(py));
                     if is_stop {
                         break;
                     }
@@ -888,7 +951,12 @@ async fn collect_streaming_response(
             }
         }
     } else {
-        let iter = Python::with_gil(|py| content.as_ref(py).call_method0("__iter__").map(|v| v.into_py(py)));
+        let iter = Python::with_gil(|py| {
+            content
+                .as_ref(py)
+                .call_method0("__iter__")
+                .map(|v| v.into_py(py))
+        });
         let iter = match iter {
             Ok(v) => v,
             Err(err) => return convert_py_error(err),
@@ -955,14 +1023,14 @@ impl PyServer {
         body: Option<Vec<u8>>,
     ) -> PyResponse {
         let method = match method.to_uppercase().as_str() {
-             "GET" => pyvectora_core::router::Method::Get,
-             "POST" => pyvectora_core::router::Method::Post,
-             "PUT" => pyvectora_core::router::Method::Put,
-             "DELETE" => pyvectora_core::router::Method::Delete,
-             "PATCH" => pyvectora_core::router::Method::Patch,
-             "HEAD" => pyvectora_core::router::Method::Head,
-             "OPTIONS" => pyvectora_core::router::Method::Options,
-             _ => pyvectora_core::router::Method::Get,
+            "GET" => pyvectora_core::router::Method::Get,
+            "POST" => pyvectora_core::router::Method::Post,
+            "PUT" => pyvectora_core::router::Method::Put,
+            "DELETE" => pyvectora_core::router::Method::Delete,
+            "PATCH" => pyvectora_core::router::Method::Patch,
+            "HEAD" => pyvectora_core::router::Method::Head,
+            "OPTIONS" => pyvectora_core::router::Method::Options,
+            _ => pyvectora_core::router::Method::Get,
         };
 
         let headers_map = headers.unwrap_or_default();
@@ -970,9 +1038,10 @@ impl PyServer {
         let body_bytes = body.map(pyvectora_core::server::Bytes::from);
 
         let rt = get_runtime();
-        let resp = rt.block_on(self.inner.test_request(
-             method, path, headers_map, body_bytes
-        ));
+        let resp = rt.block_on(
+            self.inner
+                .test_request(method, path, headers_map, body_bytes),
+        );
 
         PyResponse::from(resp)
     }

@@ -1,6 +1,6 @@
-//! # PyVectora Macros
+//! # `PyVectora` Macros
 //!
-//! Procedural macros for PyVectora framework.
+//! Procedural macros for the `PyVectora` framework.
 //! Reserved for future route decorator macros.
 //!
 //! ## Planned Features
@@ -24,12 +24,4 @@ use proc_macro::TokenStream;
 #[proc_macro_attribute]
 pub fn route(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn placeholder_test() {
-        assert!(true);
-    }
 }

@@ -41,7 +41,10 @@ pub mod validation;
 pub use database::{DatabasePool, DbValue};
 pub use error::{Error, Result};
 pub use json::{parse_json, to_json};
-pub use middleware::{CorsMiddleware, LoggingMiddleware, Middleware, MiddlewareChain, TimingMiddleware, RateLimitMiddleware};
+pub use middleware::{
+    CorsMiddleware, LoggingMiddleware, Middleware, MiddlewareChain, RateLimitMiddleware,
+    TimingMiddleware,
+};
 pub use request::PyRequest;
 pub use route::RouteInfo;
 pub use router::Router;
@@ -59,6 +62,6 @@ mod tests {
 
     #[test]
     fn test_version() {
-        assert_eq!(VERSION, "0.1.0");
+        assert_eq!(VERSION, "0.1.1");
     }
 }

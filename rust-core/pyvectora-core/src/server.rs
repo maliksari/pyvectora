@@ -18,13 +18,13 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response, StatusCode};
 use hyper_util::rt::TokioIo;
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::{error, info, warn};
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
 
 /// Authentication Configuration (JWT)
 #[derive(Clone)]
@@ -178,7 +178,14 @@ impl PyResponse {
 }
 
 /// Handler function type (async)
-pub type Handler = Arc<dyn Fn(&PyRequest, &Match<'_>) -> std::pin::Pin<Box<dyn std::future::Future<Output = PyResponse> + Send>> + Send + Sync>;
+pub type Handler = Arc<
+    dyn Fn(
+            &PyRequest,
+            &Match<'_>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = PyResponse> + Send>>
+        + Send
+        + Sync,
+>;
 
 /// High-performance HTTP server
 pub struct Server {
@@ -247,7 +254,7 @@ impl Server {
         socket.set_reuseaddr(true)?;
         #[cfg(not(windows))]
         {
-             socket.set_reuseport(true)?;
+            socket.set_reuseport(true)?;
         }
         socket.bind(addr)?;
 
@@ -362,12 +369,7 @@ impl Server {
                     .with_header("Content-Type", "application/json");
             }
         }
-        let mut req = PyRequest::new(
-            method,
-            path,
-            headers,
-            body,
-        );
+        let mut req = PyRequest::new(method, path, headers, body);
         req.set_header("x-client-ip", "test");
 
         process_request(
@@ -375,8 +377,9 @@ impl Server {
             &self.router,
             &self.handlers,
             self.auth_config.as_deref(),
-            &self.middleware
-        ).await
+            &self.middleware,
+        )
+        .await
     }
 }
 
@@ -432,9 +435,11 @@ async fn process_request(
             }
         } else {
             error!("Route requires auth but server has no JWT secret configured");
-            return PyResponse::text(r#"{"error": "Server misconfigured: Auth required but no secret set"}"#)
-                .with_status(500)
-                .with_header("Content-Type", "application/json");
+            return PyResponse::text(
+                r#"{"error": "Server misconfigured: Auth required but no secret set"}"#,
+            )
+            .with_status(500)
+            .with_header("Content-Type", "application/json");
         }
     }
 
@@ -464,27 +469,26 @@ async fn handle_request(
 ) -> std::result::Result<Response<Full<Bytes>>, hyper::Error> {
     let mut py_request = match PyRequest::from_hyper_with_limit(req, max_body_size).await {
         Ok(r) => r,
-        Err(e) => {
-            match e {
-                crate::error::Error::PayloadTooLarge { .. } => {
-                    return Ok(Response::builder()
-                        .status(StatusCode::PAYLOAD_TOO_LARGE)
-                        .body(Full::new(Bytes::from("Payload Too Large")))
-                        .unwrap());
-                }
-                _ => {
-                    error!("Failed to parse request: {}", e);
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Full::new(Bytes::from("Bad Request")))
-                        .unwrap());
-                }
+        Err(e) => match e {
+            crate::error::Error::PayloadTooLarge { .. } => {
+                return Ok(Response::builder()
+                    .status(StatusCode::PAYLOAD_TOO_LARGE)
+                    .body(Full::new(Bytes::from("Payload Too Large")))
+                    .unwrap());
             }
-        }
+            _ => {
+                error!("Failed to parse request: {}", e);
+                return Ok(Response::builder()
+                    .status(StatusCode::BAD_REQUEST)
+                    .body(Full::new(Bytes::from("Bad Request")))
+                    .unwrap());
+            }
+        },
     };
 
     py_request.set_header("x-client-ip", &remote_addr.ip().to_string());
-    let response = process_request(&mut py_request, router, handlers, auth_config, middleware).await;
+    let response =
+        process_request(&mut py_request, router, handlers, auth_config, middleware).await;
     Ok(response.into_hyper())
 }
 
@@ -492,7 +496,9 @@ static REQUEST_COUNTER: AtomicUsize = AtomicUsize::new(1);
 
 fn generate_request_id() -> String {
     use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let counter = REQUEST_COUNTER.fetch_add(1, Ordering::Relaxed);
     format!("{:x}-{:x}", now.as_nanos(), counter)
 }

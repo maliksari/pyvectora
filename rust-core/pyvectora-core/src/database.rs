@@ -10,8 +10,8 @@
 
 use crate::error::{Error, Result};
 use serde::Serialize;
-use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::postgres::{PgPool, PgPoolOptions, PgRow};
+use sqlx::sqlite::{SqlitePool, SqlitePoolOptions, SqliteRow};
 use sqlx::{Column, Row, TypeInfo};
 use std::collections::HashMap;
 
@@ -44,7 +44,9 @@ impl DatabasePool {
             .max_connections(pool_size)
             .connect(url)
             .await
-            .map_err(|e| Error::Database { message: format!("SQLite connection failed: {e}") })?;
+            .map_err(|e| Error::Database {
+                message: format!("SQLite connection failed: {e}"),
+            })?;
 
         Ok(Self::Sqlite(pool))
     }
@@ -67,7 +69,9 @@ impl DatabasePool {
             .max_connections(pool_size)
             .connect(url)
             .await
-            .map_err(|e| Error::Database { message: format!("PostgreSQL connection failed: {e}") })?;
+            .map_err(|e| Error::Database {
+                message: format!("PostgreSQL connection failed: {e}"),
+            })?;
 
         Ok(Self::Postgres(pool))
     }
@@ -78,17 +82,23 @@ impl DatabasePool {
     pub async fn execute(&self, query: &str) -> Result<u64> {
         match self {
             Self::Sqlite(pool) => {
-                let result = sqlx::query(query)
-                    .execute(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let result =
+                    sqlx::query(query)
+                        .execute(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
                 Ok(result.rows_affected())
             }
             Self::Postgres(pool) => {
-                let result = sqlx::query(query)
-                    .execute(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let result =
+                    sqlx::query(query)
+                        .execute(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
                 Ok(result.rows_affected())
             }
         }
@@ -100,18 +110,24 @@ impl DatabasePool {
     pub async fn fetch_all(&self, query: &str) -> Result<Vec<HashMap<String, DbValue>>> {
         match self {
             Self::Sqlite(pool) => {
-                let rows: Vec<SqliteRow> = sqlx::query(query)
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let rows: Vec<SqliteRow> =
+                    sqlx::query(query)
+                        .fetch_all(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
 
                 Ok(rows.iter().map(sqlite_row_to_map).collect())
             }
             Self::Postgres(pool) => {
-                let rows: Vec<PgRow> = sqlx::query(query)
-                    .fetch_all(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let rows: Vec<PgRow> =
+                    sqlx::query(query)
+                        .fetch_all(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
 
                 Ok(rows.iter().map(pg_row_to_map).collect())
             }
@@ -125,15 +141,20 @@ impl DatabasePool {
                 let row: Option<SqliteRow> = sqlx::query(query)
                     .fetch_optional(pool)
                     .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                    .map_err(|e| Error::Database {
+                        message: format!("Query error: {e}"),
+                    })?;
 
                 Ok(row.map(|r| sqlite_row_to_map(&r)))
             }
             Self::Postgres(pool) => {
-                let row: Option<PgRow> = sqlx::query(query)
-                    .fetch_optional(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let row: Option<PgRow> =
+                    sqlx::query(query)
+                        .fetch_optional(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
 
                 Ok(row.map(|r| pg_row_to_map(&r)))
             }
@@ -144,18 +165,24 @@ impl DatabasePool {
     pub async fn fetch_one(&self, query: &str) -> Result<HashMap<String, DbValue>> {
         match self {
             Self::Sqlite(pool) => {
-                let row: SqliteRow = sqlx::query(query)
-                    .fetch_one(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let row: SqliteRow =
+                    sqlx::query(query)
+                        .fetch_one(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
 
                 Ok(sqlite_row_to_map(&row))
             }
             Self::Postgres(pool) => {
-                let row: PgRow = sqlx::query(query)
-                    .fetch_one(pool)
-                    .await
-                    .map_err(|e| Error::Database { message: format!("Query error: {e}") })?;
+                let row: PgRow =
+                    sqlx::query(query)
+                        .fetch_one(pool)
+                        .await
+                        .map_err(|e| Error::Database {
+                            message: format!("Query error: {e}"),
+                        })?;
 
                 Ok(pg_row_to_map(&row))
             }
@@ -198,19 +225,24 @@ fn sqlite_row_to_map(row: &SqliteRow) -> HashMap<String, DbValue> {
         let type_name = column.type_info().name();
 
         let value = match type_name {
-            "INTEGER" => row.try_get::<i64, _>(i)
+            "INTEGER" => row
+                .try_get::<i64, _>(i)
                 .map(DbValue::Int)
                 .unwrap_or(DbValue::Null),
-            "REAL" => row.try_get::<f64, _>(i)
+            "REAL" => row
+                .try_get::<f64, _>(i)
                 .map(DbValue::Float)
                 .unwrap_or(DbValue::Null),
-            "TEXT" => row.try_get::<String, _>(i)
+            "TEXT" => row
+                .try_get::<String, _>(i)
                 .map(DbValue::String)
                 .unwrap_or(DbValue::Null),
-            "BLOB" => row.try_get::<Vec<u8>, _>(i)
+            "BLOB" => row
+                .try_get::<Vec<u8>, _>(i)
                 .map(DbValue::Bytes)
                 .unwrap_or(DbValue::Null),
-            _ => row.try_get::<String, _>(i)
+            _ => row
+                .try_get::<String, _>(i)
                 .map(DbValue::String)
                 .unwrap_or(DbValue::Null),
         };
@@ -230,19 +262,24 @@ fn pg_row_to_map(row: &PgRow) -> HashMap<String, DbValue> {
         let type_name = column.type_info().name();
 
         let value = match type_name {
-            "INT2" | "INT4" | "INT8" => row.try_get::<i64, _>(i)
+            "INT2" | "INT4" | "INT8" => row
+                .try_get::<i64, _>(i)
                 .map(DbValue::Int)
                 .unwrap_or(DbValue::Null),
-            "FLOAT4" | "FLOAT8" => row.try_get::<f64, _>(i)
+            "FLOAT4" | "FLOAT8" => row
+                .try_get::<f64, _>(i)
                 .map(DbValue::Float)
                 .unwrap_or(DbValue::Null),
-            "BOOL" => row.try_get::<bool, _>(i)
+            "BOOL" => row
+                .try_get::<bool, _>(i)
                 .map(DbValue::Bool)
                 .unwrap_or(DbValue::Null),
-            "BYTEA" => row.try_get::<Vec<u8>, _>(i)
+            "BYTEA" => row
+                .try_get::<Vec<u8>, _>(i)
                 .map(DbValue::Bytes)
                 .unwrap_or(DbValue::Null),
-            _ => row.try_get::<String, _>(i)
+            _ => row
+                .try_get::<String, _>(i)
                 .map(DbValue::String)
                 .unwrap_or(DbValue::Null),
         };
@@ -265,22 +302,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlite_create_table() {
-        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None).await.unwrap();
+        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None)
+            .await
+            .unwrap();
 
-        let result = pool.execute(
-            "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)"
-        ).await;
+        let result = pool
+            .execute("CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT)")
+            .await;
 
         assert!(result.is_ok());
     }
 
     #[tokio::test]
     async fn test_sqlite_insert_and_fetch() {
-        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None).await.unwrap();
+        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None)
+            .await
+            .unwrap();
 
-        pool.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)").await.unwrap();
-        pool.execute("INSERT INTO users (id, name) VALUES (1, 'Alice')").await.unwrap();
-        pool.execute("INSERT INTO users (id, name) VALUES (2, 'Bob')").await.unwrap();
+        pool.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)")
+            .await
+            .unwrap();
+        pool.execute("INSERT INTO users (id, name) VALUES (1, 'Alice')")
+            .await
+            .unwrap();
+        pool.execute("INSERT INTO users (id, name) VALUES (2, 'Bob')")
+            .await
+            .unwrap();
 
         let rows = pool.fetch_all("SELECT * FROM users").await.unwrap();
 
@@ -289,12 +336,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlite_fetch_one() {
-        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None).await.unwrap();
+        let pool = DatabasePool::connect_sqlite("sqlite::memory:", None)
+            .await
+            .unwrap();
 
-        pool.execute("CREATE TABLE config (key TEXT, value TEXT)").await.unwrap();
-        pool.execute("INSERT INTO config VALUES ('debug', 'true')").await.unwrap();
+        pool.execute("CREATE TABLE config (key TEXT, value TEXT)")
+            .await
+            .unwrap();
+        pool.execute("INSERT INTO config VALUES ('debug', 'true')")
+            .await
+            .unwrap();
 
-        let row = pool.fetch_one("SELECT * FROM config WHERE key = 'debug'").await.unwrap();
+        let row = pool
+            .fetch_one("SELECT * FROM config WHERE key = 'debug'")
+            .await
+            .unwrap();
 
         assert!(row.contains_key("key"));
         assert!(row.contains_key("value"));

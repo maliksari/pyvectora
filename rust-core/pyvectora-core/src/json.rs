@@ -8,9 +8,9 @@
 //! - **O**: Extensible via serde traits
 //! - **D**: Depends on serde abstractions, not concrete parsers
 
+use crate::error::{Error, Result};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use crate::error::{Error, Result};
 
 /// Parse JSON string to a typed value using simd-json
 ///
@@ -31,11 +31,10 @@ use crate::error::{Error, Result};
 pub fn parse_json<T: DeserializeOwned>(json_str: &str) -> Result<T> {
     let mut bytes = json_str.as_bytes().to_vec();
 
-    simd_json::from_slice(&mut bytes)
-        .map_err(|e| Error::InvalidRoutePattern {
-            pattern: "JSON".to_string(),
-            reason: format!("Parse error: {e}"),
-        })
+    simd_json::from_slice(&mut bytes).map_err(|e| Error::InvalidRoutePattern {
+        pattern: "JSON".to_string(),
+        reason: format!("Parse error: {e}"),
+    })
 }
 
 /// Parse JSON bytes to a typed value using simd-json
@@ -50,11 +49,10 @@ pub fn parse_json<T: DeserializeOwned>(json_str: &str) -> Result<T> {
 ///
 /// Deserialized value of type T
 pub fn parse_json_bytes<T: DeserializeOwned>(bytes: &mut [u8]) -> Result<T> {
-    simd_json::from_slice(bytes)
-        .map_err(|e| Error::InvalidRoutePattern {
-            pattern: "JSON".to_string(),
-            reason: format!("Parse error: {e}"),
-        })
+    simd_json::from_slice(bytes).map_err(|e| Error::InvalidRoutePattern {
+        pattern: "JSON".to_string(),
+        reason: format!("Parse error: {e}"),
+    })
 }
 
 /// Serialize a value to JSON string
@@ -69,20 +67,18 @@ pub fn parse_json_bytes<T: DeserializeOwned>(bytes: &mut [u8]) -> Result<T> {
 ///
 /// JSON string representation
 pub fn to_json<T: Serialize>(value: &T) -> Result<String> {
-    serde_json::to_string(value)
-        .map_err(|e| Error::InvalidRoutePattern {
-            pattern: "JSON".to_string(),
-            reason: format!("Serialize error: {e}"),
-        })
+    serde_json::to_string(value).map_err(|e| Error::InvalidRoutePattern {
+        pattern: "JSON".to_string(),
+        reason: format!("Serialize error: {e}"),
+    })
 }
 
 /// Serialize a value to pretty-printed JSON string
 pub fn to_json_pretty<T: Serialize>(value: &T) -> Result<String> {
-    serde_json::to_string_pretty(value)
-        .map_err(|e| Error::InvalidRoutePattern {
-            pattern: "JSON".to_string(),
-            reason: format!("Serialize error: {e}"),
-        })
+    serde_json::to_string_pretty(value).map_err(|e| Error::InvalidRoutePattern {
+        pattern: "JSON".to_string(),
+        reason: format!("Serialize error: {e}"),
+    })
 }
 
 #[cfg(test)]

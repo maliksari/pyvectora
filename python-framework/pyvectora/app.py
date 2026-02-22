@@ -330,7 +330,7 @@ class App:
 
         schema_json = json.dumps(openapi_schema)
 
-        def openapi_handler(req: Request):
+        def openapi_handler(req):
             return Response.json(json.loads(schema_json))
 
         docs_html = f"""
@@ -352,7 +352,7 @@ class App:
         </body>
         </html>
         """
-        def docs_handler(req: Request):
+        def docs_handler(req):
             return Response.text(docs_html).with_status(200).with_header("Content-Type", "text/html")
 
         native_app.get("/openapi.json", make_internal(openapi_handler))
@@ -360,12 +360,12 @@ class App:
         print("📚 Docs available at /docs")
 
         if self.enable_health_check:
-            def health_handler(req: Request):
+            def health_handler(req):
                 import time
                 health_data = {
                     "status": "healthy" if self._is_ready else "starting",
                     "uptime_seconds": round(time.time() - self._startup_time, 2) if self._startup_time else 0,
-                    "version": __version__ if '__version__' in dir() else "0.1.0"
+                    "version": "0.1.0",
                 }
                 return Response.json(health_data)
 

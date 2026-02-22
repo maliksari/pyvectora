@@ -24,8 +24,11 @@ Usage:
     all_users = users.find_all()
 """
 
-from typing import Any, Dict, List, Optional, Type, TypeVar, Generic
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, Type, TypeVar
 from abc import ABC
+
+if TYPE_CHECKING:
+    from .database import Database
 
 T = TypeVar('T')
 

@@ -14,10 +14,10 @@ use crate::types::ParamValue;
 use http_body_util::BodyExt;
 use hyper::body::Bytes;
 use hyper::Request;
-use std::collections::HashMap;
-use serde_json::Value;
 use pyo3::prelude::*;
 use pyo3::types::{PyBytes, PyDict, PyString};
+use serde_json::Value;
+use std::collections::HashMap;
 
 /// HTTP Request wrapper for Python interop
 ///
@@ -110,12 +110,10 @@ impl PyRequest {
     #[getter]
     fn text(&self, py: Python<'_>) -> PyResult<PyObject> {
         match &self.body {
-            Some(b) => {
-                match std::str::from_utf8(b) {
-                    Ok(s) => Ok(PyString::new(py, s).into()),
-                    Err(_) => Ok(py.None()),
-                }
-            }
+            Some(b) => match std::str::from_utf8(b) {
+                Ok(s) => Ok(PyString::new(py, s).into()),
+                Err(_) => Ok(py.None()),
+            },
             None => Ok(py.None()),
         }
     }
@@ -177,7 +175,10 @@ impl PyRequest {
     }
 
     /// Create from hyper request with body size limit
-    pub async fn from_hyper_with_limit(req: Request<hyper::body::Incoming>, max_body_size: usize) -> Result<Self> {
+    pub async fn from_hyper_with_limit(
+        req: Request<hyper::body::Incoming>,
+        max_body_size: usize,
+    ) -> Result<Self> {
         let method = match *req.method() {
             hyper::Method::GET => Method::Get,
             hyper::Method::POST => Method::Post,

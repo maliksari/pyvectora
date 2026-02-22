@@ -133,18 +133,22 @@ impl ParamValue {
 pub fn convert_param(raw: &str, param_type: ParamType) -> Result<ParamValue> {
     match param_type {
         ParamType::String => Ok(ParamValue::String(raw.to_string())),
-        ParamType::Int => raw.parse::<i64>().map(ParamValue::Int).map_err(|_| {
-            Error::InvalidRoutePattern {
-                pattern: raw.to_string(),
-                reason: format!("Cannot convert '{}' to integer", raw),
-            }
-        }),
-        ParamType::Float => raw.parse::<f64>().map(ParamValue::Float).map_err(|_| {
-            Error::InvalidRoutePattern {
-                pattern: raw.to_string(),
-                reason: format!("Cannot convert '{}' to float", raw),
-            }
-        }),
+        ParamType::Int => {
+            raw.parse::<i64>()
+                .map(ParamValue::Int)
+                .map_err(|_| Error::InvalidRoutePattern {
+                    pattern: raw.to_string(),
+                    reason: format!("Cannot convert '{}' to integer", raw),
+                })
+        }
+        ParamType::Float => {
+            raw.parse::<f64>()
+                .map(ParamValue::Float)
+                .map_err(|_| Error::InvalidRoutePattern {
+                    pattern: raw.to_string(),
+                    reason: format!("Cannot convert '{}' to float", raw),
+                })
+        }
         ParamType::Bool => match raw.to_lowercase().as_str() {
             "true" | "1" | "yes" => Ok(ParamValue::Bool(true)),
             "false" | "0" | "no" => Ok(ParamValue::Bool(false)),
@@ -224,10 +228,22 @@ mod tests {
 
     #[test]
     fn test_convert_bool() {
-        assert_eq!(convert_param("true", ParamType::Bool).unwrap(), ParamValue::Bool(true));
-        assert_eq!(convert_param("false", ParamType::Bool).unwrap(), ParamValue::Bool(false));
-        assert_eq!(convert_param("1", ParamType::Bool).unwrap(), ParamValue::Bool(true));
-        assert_eq!(convert_param("0", ParamType::Bool).unwrap(), ParamValue::Bool(false));
+        assert_eq!(
+            convert_param("true", ParamType::Bool).unwrap(),
+            ParamValue::Bool(true)
+        );
+        assert_eq!(
+            convert_param("false", ParamType::Bool).unwrap(),
+            ParamValue::Bool(false)
+        );
+        assert_eq!(
+            convert_param("1", ParamType::Bool).unwrap(),
+            ParamValue::Bool(true)
+        );
+        assert_eq!(
+            convert_param("0", ParamType::Bool).unwrap(),
+            ParamValue::Bool(false)
+        );
     }
 
     #[test]

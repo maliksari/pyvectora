@@ -168,7 +168,12 @@ impl Router {
     ///
     /// Returns `Error::InvalidRoutePattern` if the pattern is malformed
     /// Returns `Error::InvalidRoutePattern` if the pattern is malformed
-    pub fn add_route(&mut self, method: Method, path: &str, auth_required: bool) -> Result<HandlerId> {
+    pub fn add_route(
+        &mut self,
+        method: Method,
+        path: &str,
+        auth_required: bool,
+    ) -> Result<HandlerId> {
         let handler_id = self.next_handler_id;
         self.next_handler_id += 1;
 
@@ -211,12 +216,12 @@ impl Router {
     ///
     /// Returns `Error::RouteNotFound` if no matching route exists
     pub fn match_route<'a>(&'a self, method: Method, path: &'a str) -> Result<Match<'a>> {
-        let method_routes = self
-            .method_routes
-            .get(&method)
-            .ok_or_else(|| Error::RouteNotFound {
-                path: path.to_string(),
-            })?;
+        let method_routes =
+            self.method_routes
+                .get(&method)
+                .ok_or_else(|| Error::RouteNotFound {
+                    path: path.to_string(),
+                })?;
 
         let matched = method_routes
             .router
@@ -357,7 +362,9 @@ mod tests {
         let mut router = Router::new();
         router.get("/orders/{id:int}/status/{active:bool}").unwrap();
 
-        let m = router.match_route(Method::Get, "/orders/42/status/true").unwrap();
+        let m = router
+            .match_route(Method::Get, "/orders/42/status/true")
+            .unwrap();
 
         assert_eq!(m.get_int("id"), Some(42));
         assert_eq!(m.get_bool("active"), Some(true));

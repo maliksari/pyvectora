@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Rust checks
+  rust-check:
+    name: Rust Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+      
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Check formatting
+        run: cargo fmt --check
+      
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      
+      - name: Run tests
+        run: cargo test --workspace
+
+  # Python checks
+  python-check:
+    name: Python Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install ruff
+        run: pip install ruff
+      
+      - name: Run ruff linter
+        run: ruff check python-framework/
+      
+      - name: Run ruff formatter check
+        run: ruff format --check python-framework/
+
+  # Build and test native module
+  build:
+    name: Build Native Module
+    needs: [rust-check, python-check]
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+      
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Install maturin
+        run: pip install maturin
+      
+      - name: Build native module
+        working-directory: python-framework
+        run: maturin build --release
+      
+      - name: Install package
+        working-directory: python-framework
+        run: pip install ../target/wheels/*.whl
+      
+      - name: Test import
+        run: python -c "import pyvectora; print(f'Version: {pyvectora.__version__}')"
+
+  # Integration tests
+  integration-test:
+    name: Integration Tests
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+      
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+      
+      - name: Install maturin and test deps
+        run: pip install maturin pytest httpx
+      
+      - name: Build and install
+        working-directory: python-framework
+        run: maturin develop
+      
+      - name: Start server in background
+        working-directory: examples/hello_api
+        run: |
+          python main.py &
+          sleep 3  # Wait for server to start
+      
+      - name: Run API tests
+        working-directory: examples/hello_api
+        run: pytest test_api.py -v

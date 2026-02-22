@@ -1,0 +1,39 @@
+# Ruff configuration for PyVectora Python code
+# https://docs.astral.sh/ruff/
+
+target-version = "py39"
+line-length = 100
+
+[lint]
+select = [
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "F",      # Pyflakes
+    "I",      # isort
+    "B",      # flake8-bugbear
+    "C4",     # flake8-comprehensions
+    "UP",     # pyupgrade
+    "ARG",    # flake8-unused-arguments
+    "SIM",    # flake8-simplify
+    "TCH",    # flake8-type-checking
+    "PTH",    # flake8-use-pathlib
+    "RUF",    # Ruff-specific rules
+]
+
+ignore = [
+    "E501",   # Line too long (handled by formatter)
+    "B008",   # Do not perform function calls in argument defaults
+]
+
+[lint.isort]
+known-first-party = ["pyvectora"]
+combine-as-imports = true
+
+[lint.per-file-ignores]
+"tests/*" = ["ARG"]
+"examples/*" = ["ARG"]
+
+[format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

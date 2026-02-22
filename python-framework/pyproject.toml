@@ -1,0 +1,58 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyvectora"
+version = "0.1.0"
+description = "Rust-powered Python framework for high-performance APIs, AI and microservices"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [{ name = "maliksari", email = "malik.sari06@gmail.com" }]
+keywords = ["web", "framework", "async", "rust", "high-performance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: AsyncIO",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Internet :: WWW/HTTP :: HTTP Servers",
+    "Typing :: Typed",
+]
+dependencies = [
+    "pydantic>=2.0",
+    "typer>=0.9.0",
+    "watchfiles>=0.21.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "httpx>=0.24",
+    "ruff>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/pyvectora/pyvectora"
+Documentation = "https://pyvectora.dev"
+Repository = "https://github.com/pyvectora/pyvectora"
+
+[tool.maturin]
+# Build the bindings crate
+manifest-path = "../rust-core/pyvectora-bindings/Cargo.toml"
+# Python module name (must match lib.name in Cargo.toml)
+module-name = "pyvectora.pyvectora_native"
+# Features to enable
+features = ["pyo3/extension-module"]
+# Build as Python extension
+python-source = "."
+# Strip debug symbols for smaller wheels
+strip = true

@@ -1,0 +1,27 @@
+[package]
+name = "pyvectora-bindings"
+description = "Python bindings for PyVectora using PyO3"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "pyvectora_native"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3.workspace = true
+pyo3-asyncio.workspace = true
+pyvectora-core.workspace = true
+tokio.workspace = true
+tokio-util = "0.7"
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true

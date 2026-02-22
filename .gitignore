@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+examples
+docs
+
+# Project-local artifacts
+check_output.txt
+task.md
+.DS_Store
+.idea/
+.vscode/
+task.md
